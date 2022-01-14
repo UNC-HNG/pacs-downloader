@@ -1,5 +1,4 @@
 from json.decoder import JSONDecodeError
-from typing import OrderedDict
 import requests
 import json
 from requests.auth import HTTPBasicAuth
