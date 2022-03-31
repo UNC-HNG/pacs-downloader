@@ -1,10 +1,12 @@
 from json.decoder import JSONDecodeError
+from urllib.error import HTTPError
 import requests
 import json
 from requests.auth import HTTPBasicAuth
 from pathlib import Path
 import click
 import sys
+import re
 from yaml import safe_load, YAMLError
 
 from datetime import date, datetime
@@ -57,6 +59,14 @@ def get_studies_by_date(auth, fetch_date: date=date.today()):
 
     # Perform query
     response = requests.get(f"{QUERY_URL}/studies", auth=auth, params=params)
+
+    try:
+        response.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        if response.status_code == 401:
+            raise ValueError("Invalid credentials provided - please check your username and password.")
+        raise e
+
 
     # Load response json
     raw_studies = json.loads(response.text)
@@ -117,6 +127,21 @@ def get_instances_by_study_series(study_id, series_id, auth):
 
     return instances
 
+def get_auth(auth_file: str=None):
+    if not auth_file: 
+        print('No auth file providing - checking current directory for "pacs_credentials.yaml"')
+        auth_file = 'pacs_credentials.yaml'
+        
+    with open(auth_file) as file:
+        try:
+            creds = safe_load(file)
+            username = creds['username']
+            password = creds['password']
+        except YAMLError as ye:
+            print(ye)
+
+    return HTTPBasicAuth(username, password)
+
 def download_instance(study_id, series_id, instance_id, target_path, auth):
 
     url = f"{RETRIEVAL_URL}/{study_id}/series/{series_id}/instance/{instance_id}"
@@ -139,83 +164,149 @@ def print_items(items: dict):
                 value = code
             print(f"{value}: {item[code]['Value']}")
 
-@click.command()
-@click.option('--fetch_date', '-d')
-@click.option('--auth_file', '-a')  
-def get_studies(fetch_date, auth_file):
-    if fetch_date is None:
-        fetch_date = date.today()
-    else:
-        fetch_date = datetime.strptime(fetch_date, "%Y-%m-%d")
+def prompt_user_for_studies(studies):
+    """
+    Prompt the user to pick one of the studies given
 
-    auth = get_auth(auth_file=auth_file)
-    studies = get_studies_by_date(auth, fetch_date=fetch_date)
+    TODO: Allow user to pick more than one study
+    """
+    print("Options:")
+    for index, _ in enumerate(studies):
+        print(f"[{index}]: {studies[index]['patient_id']}")
 
-    if studies:
-        print("Options:")
-        for index, study in enumerate(studies):
-            print(f"[{index}]: {studies[index]['patient_id']}")
+    value = click.prompt(f'Choose a study to download ({0} - {len(studies) - 1})', type=int)
+    if value < 0 or value > len(studies) - 1:
+        print("Invalid option")
+        sys.exit()
+    chosen_study = studies[value]
+    
+    return [chosen_study]
 
-        value = click.prompt(f'Choose a study to download ({0} - {len(studies) - 1})', type=int)
-        if value < 0 or value > len(studies) - 1:
-            print("Invalid option")
-            sys.exit()
-        chosen_study = studies[value]
-        print(f"Processing study: {chosen_study['patient_id']}")
+def get_download_config(download_config):
+    """
+    Move ;
+    Pick the studies that match the study_name and regex pattern from download_config
+    """
+
+    if not download_config: 
+        print('No download config file providing - checking current directory for "downloader_config.yaml"')
+        download_config = 'downloader_config.yaml'
         
+    with open(download_config) as file:
+        try:
+            config = safe_load(file)
+            
+            return config
+        except YAMLError as ye:
+            raise YAMLError(ye)
+        except KeyError:
+            raise KeyError("Did not profile for provided study name")
 
-        series = get_series_by_study_and_date(chosen_study["study_id"], auth, fetch_date=input_date)
+def download_study(chosen_study, auth, fetch_date, out_dir, interactive=False):
+    print(f"Processing study: {chosen_study['patient_id']}")
+    
+    series = get_series_by_study_and_date(chosen_study["study_id"], auth, fetch_date=fetch_date)
 
-        for index, series_item in enumerate(series):
-            print(f"[{index}]: {series[index]['series_description']}")
-        print(f"[{len(series)}]: ALL SERIES")
+    for index, series_item in enumerate(series):
+        print(f"[{index}]: {series[index]['series_description']}")
+    print(f"[{len(series)}]: ALL SERIES")
 
+    # If running interactive, have user pick series to download, or all
+    series_to_process = []
+    if interactive:
         value = click.prompt(f'Choose a series to download ({0} - {len(series)})', type=int)
         if value < 0 or value > len(series):
             print("Invalid option")
-            sys.exit()
-        
-        series_to_process = []
+            sys.exit()  
         # if a single series was chosen
         if value < len(series):
             series_to_process.append(series[value])
         else:
             series_to_process += series
+    else:
+        series_to_process += series
 
-        study_path = Path(chosen_study['patient_id'])
-        study_path.mkdir(exist_ok=True)
+    try:
+        study_name = chosen_study['subject_id']
+    except KeyError:
+        study_name = chosen_study['patient_id']
 
-        for series_item in series_to_process:
-            series_path = Path(study_path / series_item['series_description'])
-            series_path.mkdir(exist_ok=True)
+    
+    study_path = Path(study_name)
+    if out_dir:
+        study_path = Path(out_dir) / study_path
+    study_path.mkdir(exist_ok=True, parents=True)
 
-            instances = get_instances_by_study_series(chosen_study["study_id"], series_item["series_id"], auth)
+    for series_item in series_to_process:
+        series_path = Path(study_path / series_item['series_description'])
+        series_path.mkdir(exist_ok=True)
 
-            print(f"Downloading series: {series_item['series_description']}")
+        instances = get_instances_by_study_series(chosen_study["study_id"], series_item["series_id"], auth)
 
-            for index, instance in enumerate(instances):
-                print(f"Downloading instance {index + 1} of {len(instances)}")
-                instance_path = series_path / Path(instance['instance_id'] + ".dcm")
-                download_instance(chosen_study["study_id"], series_item['series_id'], instance['instance_id'], instance_path, auth)
+        print(f"Downloading series: {series_item['series_description']}")
+
+        for index, instance in enumerate(instances):
+            print(f"Downloading instance {index + 1} of {len(instances)}")
+            instance_path = series_path / Path(instance['instance_id'] + ".dcm")
+            download_instance(chosen_study["study_id"], series_item['series_id'], instance['instance_id'], instance_path, auth)
+
+
+def get_studies(fetch_date, auth_file, download_config, out_dir):
+    """
+    This method drives the download process from the CLI interactively, or from
+    the download_configuration, if provided
+    """
+
+    # Take today's date if one is not provided through CLI
+    if fetch_date is None:
+        fetch_date = date.today()
+    else:
+        fetch_date = datetime.strptime(fetch_date, "%Y-%m-%d")
+
+    # Setup basic auth from provided auth yaml file
+    auth = get_auth(auth_file=auth_file)
+    # Initial query to get list of studies on given date
+    studies = get_studies_by_date(auth, fetch_date=fetch_date)
+
+    # Only proceed if we found studies for given date
+    if studies:
+        studies_to_download = []
+        interactive = False
+
+        # yaml-driven
+        if download_config:
+            # Grab regex patterns from yaml
+            download_config = get_download_config(download_config)
+            patient_id_pattern = download_config['patient_id_pattern']
+            patient_subject_id_pattern = download_config['patient_subject_id_pattern']
+
+            # Go through the studies from given date and see if any match the pattern
+            for study in studies:
+                is_match = re.match(patient_id_pattern, study['patient_id'])
+                if is_match:
+                    studies_to_download.append(study)
+                    if patient_subject_id_pattern:
+                        study['subject_id'] = str(re.match(patient_subject_id_pattern, study['patient_id'])[0])
+            
+        # Interactive?
+        else:
+            studies_to_download = prompt_user_for_studies(studies)
+            interactive = True
+
+        # Now the we finally download the studies
+        for study in studies_to_download:
+            download_study(study, auth, fetch_date, out_dir, interactive=interactive)
         
     else:
         print("No studies found for this date")
 
-def get_auth(auth_file: str=None):
-    if not auth_file: 
-        print('No auth file providing - checking current directory for "pacs_credentials.yaml"')
-        auth_file = 'pacs_credentials.yaml'
-        
-    with open(auth_file) as file:
-        try:
-            creds = safe_load(file)
-            username = creds['username']
-            password = creds['password']
-        except YAMLError as ye:
-            print(ye)
-
-    return HTTPBasicAuth(username, password)
-
+@click.command()
+@click.option('--fetch_date', '-d')
+@click.option('--auth_file', '-a')  
+@click.option('--download_config', '-c')
+@click.option('--out_dir', '-o')
+def get_studies_cli(fetch_date, auth_file, download_config, out_dir):
+    get_studies(fetch_date, auth_file, download_config, out_dir)
 
 if __name__ == '__main__':
-    get_studies()
+    get_studies_cli()
