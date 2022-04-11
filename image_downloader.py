@@ -142,29 +142,36 @@ def get_auth(auth_file: str=None):
 
     return HTTPBasicAuth(username, password)
 
-def download_instance(study_id, series_id, instance_id, target_path, auth):
+def download_instances(study_id, series_id, instances, series_path, auth):
+
+    # Any once instance URL request gives back all instances for some reason - so
+    # we can just take the first one
+    instance_id = instances[0]['instance_id']
 
     url = f"{RETRIEVAL_URL}/{study_id}/series/{series_id}/instance/{instance_id}"
     headers = {"Accpet": "application/dicom"}
-
     response = requests.get(url, headers=headers, auth=auth)
 
     from requests_toolbelt.multipart import decoder
 
     multipart_data = decoder.MultipartDecoder.from_response(response)
 
-    for part in multipart_data.parts:
-        print(f"Part size: {sys.getsizeof(part.content) / 1000000}MB")
+    for index, part in enumerate(multipart_data.parts):
+        print(f"Instance size: {sys.getsizeof(part.content) / 1000000}MB")
         print(part.headers)
-    print(len(multipart_data.parts))
 
-    print(f"Response size: {sys.getsizeof(response.content) / 1000000}MB")
+        print(f"Downloading instance {index + 1} of {len(multipart_data.parts)}")
+        instance_path = series_path / Path(f"instance-{index}.dcm")
 
-    # trims off non-dicom portion of response body
-    trimmed_response_content = response.content[112:]
+        # trims off non-dicom portion of response body
+        trimmed_response_content = part.content[112:]
 
-    with open(target_path, mode='wb') as file:     
-        file.write(trimmed_response_content)
+        with open(instance_path, mode='wb') as file:     
+            file.write(trimmed_response_content)
+
+    print(f"Total series size: {sys.getsizeof(response.content) / 1000000}MB")
+
+    
 
 def print_items(items: dict):
     for item in items:
@@ -264,11 +271,8 @@ def download_study(chosen_study, auth, fetch_date, out_dir, interactive=False, c
                 instances = get_instances_by_study_series(chosen_study["study_id"], series_item["series_id"], auth)
 
                 print(f"Downloading series: {series_item['series_description']}")
-
-                for index, instance in enumerate(instances):
-                    print(f"Downloading instance {index + 1} of {len(instances)}")
-                    instance_path = series_path / Path(instance['instance_id'] + ".dcm")
-                    download_instance(chosen_study["study_id"], series_item['series_id'], instance['instance_id'], instance_path, auth)
+    
+                download_instances(chosen_study["study_id"], series_item['series_id'], instances, series_path, auth)
 
                 cache.write(series_item['series_description'])
 
