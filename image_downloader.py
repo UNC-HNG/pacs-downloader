@@ -145,8 +145,20 @@ def get_auth(auth_file: str=None):
 def download_instance(study_id, series_id, instance_id, target_path, auth):
 
     url = f"{RETRIEVAL_URL}/{study_id}/series/{series_id}/instance/{instance_id}"
+    headers = {"Accpet": "application/dicom"}
 
-    response = requests.get(url, auth=auth)
+    response = requests.get(url, headers=headers, auth=auth)
+
+    from requests_toolbelt.multipart import decoder
+
+    multipart_data = decoder.MultipartDecoder.from_response(response)
+
+    for part in multipart_data.parts:
+        print(f"Part size: {sys.getsizeof(part.content) / 1000000}MB")
+        print(part.headers)
+    print(len(multipart_data.parts))
+
+    print(f"Response size: {sys.getsizeof(response.content) / 1000000}MB")
 
     # trims off non-dicom portion of response body
     trimmed_response_content = response.content[112:]
@@ -202,7 +214,7 @@ def get_download_config(download_config):
         except KeyError:
             raise KeyError("Did not profile for provided study name")
 
-def download_study(chosen_study, auth, fetch_date, out_dir, interactive=False):
+def download_study(chosen_study, auth, fetch_date, out_dir, interactive=False, cache_file="cache.txt"):
     print(f"Processing study: {chosen_study['patient_id']}")
     
     series = get_series_by_study_and_date(chosen_study["study_id"], auth, fetch_date=fetch_date)
@@ -237,18 +249,28 @@ def download_study(chosen_study, auth, fetch_date, out_dir, interactive=False):
         study_path = Path(out_dir) / study_path
     study_path.mkdir(exist_ok=True, parents=True)
 
-    for series_item in series_to_process:
-        series_path = Path(study_path / series_item['series_description'])
-        series_path.mkdir(exist_ok=True)
+    skip_list = []
+    with open(cache_file, 'r') as cache:
+        for line in cache.readlines():
+            skip_list.append(line.replace('\n', ""))
 
-        instances = get_instances_by_study_series(chosen_study["study_id"], series_item["series_id"], auth)
+    with open(cache_file, 'a') as cache:
+        for series_item in series_to_process:
+            if series_item['series_description'] not in skip_list:
+                series_path = Path(study_path / series_item['series_description'])
 
-        print(f"Downloading series: {series_item['series_description']}")
+                series_path.mkdir(exist_ok=True)
 
-        for index, instance in enumerate(instances):
-            print(f"Downloading instance {index + 1} of {len(instances)}")
-            instance_path = series_path / Path(instance['instance_id'] + ".dcm")
-            download_instance(chosen_study["study_id"], series_item['series_id'], instance['instance_id'], instance_path, auth)
+                instances = get_instances_by_study_series(chosen_study["study_id"], series_item["series_id"], auth)
+
+                print(f"Downloading series: {series_item['series_description']}")
+
+                for index, instance in enumerate(instances):
+                    print(f"Downloading instance {index + 1} of {len(instances)}")
+                    instance_path = series_path / Path(instance['instance_id'] + ".dcm")
+                    download_instance(chosen_study["study_id"], series_item['series_id'], instance['instance_id'], instance_path, auth)
+
+                cache.write(series_item['series_description'])
 
 
 def get_studies(fetch_date, auth_file, download_config, out_dir):
