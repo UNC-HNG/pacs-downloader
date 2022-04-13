@@ -103,8 +103,9 @@ def get_series_by_study_and_date(study_id, auth, fetch_date: date=date.today()):
     for series_item in raw_series:
             series_id = series_item["0020000E"]["Value"][0]
             series_description = series_item["0008103E"]["Value"][0]
+            series_number = series_item["00200011"]["Value"][0]
             
-            series.append({"series_id":series_id, "series_description": series_description, "instances":{}})
+            series.append({"series_id":series_id, "series_description": series_description, "series_number":series_number, "instances":{}})
 
     return series
 
@@ -149,7 +150,8 @@ def download_instances(study_id, series_id, instances, series_path, auth):
     instance_id = instances[0]['instance_id']
 
     url = f"{RETRIEVAL_URL}/{study_id}/series/{series_id}/instance/{instance_id}"
-    headers = {"Accpet": "application/dicom"}
+    headers = {"Accept": "application/dicom"}
+    print(f"Downloading instances...")
     response = requests.get(url, headers=headers, auth=auth)
 
     from requests_toolbelt.multipart import decoder
@@ -160,11 +162,12 @@ def download_instances(study_id, series_id, instances, series_path, auth):
         print(f"Instance size: {sys.getsizeof(part.content) / 1000000}MB")
         print(part.headers)
 
-        print(f"Downloading instance {index + 1} of {len(multipart_data.parts)}")
-        instance_path = series_path / Path(f"instance-{index}.dcm")
+        print(f"Saving instance {index + 1} of {len(multipart_data.parts)}")
+        # instances list from series API is in same order as multi-part form
+        instance_path = series_path / Path(f"{instances[index]['instance_id']}.dcm")
 
         # trims off non-dicom portion of response body
-        trimmed_response_content = part.content[112:]
+        trimmed_response_content = part.content #[112:]
 
         with open(instance_path, mode='wb') as file:     
             file.write(trimmed_response_content)
@@ -257,14 +260,17 @@ def download_study(chosen_study, auth, fetch_date, out_dir, interactive=False, c
     study_path.mkdir(exist_ok=True, parents=True)
 
     skip_list = []
-    with open(cache_file, 'r') as cache:
-        for line in cache.readlines():
-            skip_list.append(line.replace('\n', ""))
+    cache_file = Path(cache_file)
+
+    if cache_file.exists():
+        with open(cache_file, 'r') as cache:
+            for line in cache.readlines():
+                skip_list.append(line.replace('\n', ""))
 
     with open(cache_file, 'a') as cache:
         for series_item in series_to_process:
             if series_item['series_description'] not in skip_list:
-                series_path = Path(study_path / series_item['series_description'])
+                series_path = Path(study_path / f"{series_item['series_number']}_{series_item['series_description']}")
 
                 series_path.mkdir(exist_ok=True)
 
