@@ -259,29 +259,6 @@ def download_study(chosen_study, auth, fetch_date, out_dir, interactive=False, c
         study_path = Path(out_dir) / study_path
     study_path.mkdir(exist_ok=True, parents=True)
 
-    skip_list = []
-    cache_file = Path(cache_file)
-
-    if cache_file.exists():
-        with open(cache_file, 'r') as cache:
-            for line in cache.readlines():
-                skip_list.append(line.replace('\n', ""))
-
-    with open(cache_file, 'a') as cache:
-        for series_item in series_to_process:
-            if series_item['series_description'] not in skip_list:
-                series_path = Path(study_path / f"{series_item['series_number']}_{series_item['series_description']}")
-
-                series_path.mkdir(exist_ok=True)
-
-                instances = get_instances_by_study_series(chosen_study["study_id"], series_item["series_id"], auth)
-
-                print(f"Downloading series: {series_item['series_description']}")
-    
-                download_instances(chosen_study["study_id"], series_item['series_id'], instances, series_path, auth)
-
-                cache.write(series_item['series_description'])
-
 
 def get_studies(fetch_date, auth_file, download_config, out_dir):
     """
