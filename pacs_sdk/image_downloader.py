@@ -158,22 +158,17 @@ def download_instances(study_id, series_id, instances, series_path, auth):
 
     multipart_data = decoder.MultipartDecoder.from_response(response)
 
+    print(f"Saving {len(multipart_data.parts)} instances")
     for index, part in enumerate(multipart_data.parts):
-        print(f"Instance size: {sys.getsizeof(part.content) / 1000000}MB")
-        print(part.headers)
-
-        print(f"Saving instance {index + 1} of {len(multipart_data.parts)}")
         # instances list from series API is in same order as multi-part form
-        
         instance_path = series_path / Path(f"{instances[index]['instance_id']}.dcm")
 
-        # trims off non-dicom portion of response body
-        trimmed_response_content = part.content #[112:]
+        response_content = part.content
 
         with open(instance_path, mode='wb') as file:     
-            file.write(trimmed_response_content)
+            file.write(response_content)
 
-    print(f"Total series size: {sys.getsizeof(response.content) / 1000000}MB")
+    print(f"Finished download of series {series_id}. Total size: {sys.getsizeof(response.content) / 1000000}MB")
 
     
 
