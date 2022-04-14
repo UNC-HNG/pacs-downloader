@@ -16,6 +16,7 @@ setup(name='pacs-sdk',
                         'pydicom>=2.2.2',
                         'PyYAML>=6.0',
                         'requests>=2.27.1',
+                        'requests-toolbelt>=0.9.1',
                         'urllib3>=1.26.7'],
       entry_points='''
       [console_scripts]
