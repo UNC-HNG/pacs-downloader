@@ -164,6 +164,7 @@ def download_instances(study_id, series_id, instances, series_path, auth):
 
         print(f"Saving instance {index + 1} of {len(multipart_data.parts)}")
         # instances list from series API is in same order as multi-part form
+        
         instance_path = series_path / Path(f"{instances[index]['instance_id']}.dcm")
 
         # trims off non-dicom portion of response body
@@ -224,7 +225,7 @@ def get_download_config(download_config):
         except KeyError:
             raise KeyError("Did not profile for provided study name")
 
-def download_study(chosen_study, auth, fetch_date, out_dir, interactive=False, cache_file="cache.txt"):
+def download_study(chosen_study, auth, fetch_date, out_dir, interactive=False):
     print(f"Processing study: {chosen_study['patient_id']}")
     
     series = get_series_by_study_and_date(chosen_study["study_id"], auth, fetch_date=fetch_date)
@@ -259,6 +260,21 @@ def download_study(chosen_study, auth, fetch_date, out_dir, interactive=False, c
         study_path = Path(out_dir) / study_path
     study_path.mkdir(exist_ok=True, parents=True)
 
+    for series_item in series_to_process:
+        try:
+            series_path = Path(study_path / f"{series_item['subject_id']}")
+        except KeyError:
+            series_path = Path(study_path / f"{series_item['series_number']}_{series_item['series_description']}")
+
+        series_path.mkdir(exist_ok=True)
+
+        instances = get_instances_by_study_series(chosen_study["study_id"], series_item["series_id"], auth)
+
+        print(f"Downloading series: {series_item['series_description']}")
+
+        download_instances(chosen_study["study_id"], series_item['series_id'], instances, series_path, auth)
+
+
 
 def get_studies(fetch_date, auth_file, download_config, out_dir):
     """
@@ -291,11 +307,18 @@ def get_studies(fetch_date, auth_file, download_config, out_dir):
 
             # Go through the studies from given date and see if any match the pattern
             for study in studies:
-                is_match = re.match(patient_id_pattern, study['patient_id'])
+                is_match = re.search(patient_id_pattern, study['patient_id'])
                 if is_match:
                     studies_to_download.append(study)
                     if patient_subject_id_pattern:
-                        study['subject_id'] = str(re.match(patient_subject_id_pattern, study['patient_id'])[0])
+                        try:
+                            study['subject_id'] = str(re.search(patient_subject_id_pattern, study['patient_id'])[0])
+                        except TypeError:
+                            print(f"No pattern found matching {patient_subject_id_pattern} in {study['patient_id']}")
+                            sys.exit()
+            if not studies_to_download:
+                print(f"No studies matching pattern: {patient_id_pattern}")
+                sys.exit()
             
         # Interactive?
         else:
