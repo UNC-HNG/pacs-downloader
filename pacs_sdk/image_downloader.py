@@ -9,7 +9,7 @@ import sys
 import re
 from yaml import safe_load, YAMLError
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 CODE_MAP = {
     "00080020":"Study Date",
@@ -279,10 +279,13 @@ def get_studies(fetch_date, auth_file, download_config, out_dir):
     This method drives the download process from the CLI interactively, or from
     the download_configuration, if provided
     """
+    today = date.today()
 
     # Take today's date if one is not provided through CLI
-    if fetch_date is None:
-        fetch_date = date.today()
+    if fetch_date is None or fetch_date is "today":
+        fetch_date = today
+    elif fetch_date is "yesterday":
+        fetch_date = today - timedelta(days=1)
     else:
         fetch_date = datetime.strptime(fetch_date, "%Y-%m-%d")
 
