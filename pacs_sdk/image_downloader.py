@@ -331,7 +331,7 @@ def get_studies(fetch_date, auth_file, download_config, out_dir):
         print("No studies found for this date")
 
 @click.command()
-@click.option('--fetch_date', '-d', required=True, help="Use to choose a date to search for data to download. Defaults to current day.")
+@click.option('--fetch_date', '-d', required=False, help="Use to choose a date to search for data to download. Defaults to current day.")
 @click.option('--auth_file', '-a', required=True, help="A .yaml file containing your PACS credentials. See the project README for help setting this up.")  
 @click.option('--download_config', '-c', required=False, help="A .yaml file which helps specify which studies to download.")
 @click.option('--out_dir', '-o', required=False, help="Where to save the image data - defaults to current directory.")
