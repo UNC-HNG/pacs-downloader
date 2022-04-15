@@ -67,6 +67,9 @@ def get_studies_by_date(auth, fetch_date: date=date.today()):
             raise ValueError("Invalid credentials provided - please check your username and password.")
         raise e
 
+    if response.status_code == 204:
+        print(f"No studies found for date: {fetch_date}")
+        sys.exit()
 
     # Load response json
     raw_studies = json.loads(response.text)
