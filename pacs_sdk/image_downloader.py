@@ -282,9 +282,9 @@ def get_studies(fetch_date, auth_file, download_config, out_dir):
     today = date.today()
 
     # Take today's date if one is not provided through CLI
-    if fetch_date is None or fetch_date is "today":
+    if fetch_date is None or fetch_date == "today":
         fetch_date = today
-    elif fetch_date is "yesterday":
+    elif fetch_date == "yesterday":
         fetch_date = today - timedelta(days=1)
     else:
         fetch_date = datetime.strptime(fetch_date, "%Y-%m-%d")
