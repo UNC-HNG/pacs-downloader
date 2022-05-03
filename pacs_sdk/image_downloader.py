@@ -363,7 +363,7 @@ def get_studies(fetch_date, auth_file, download_config, out_dir, interactive=Fal
 @click.option('--download_config', '-c', required=False, help="A .yaml file which helps specify which studies to download.")
 @click.option('--out_dir', '-o', required=False, help="Where to save the image data - defaults to current directory.")
 def get_studies_cli(interactive, fetch_date, auth_file, download_config, out_dir):
-    get_studies(fetch_date, auth_file, download_config, out_dir, interactive=False)
+    get_studies(fetch_date, auth_file, download_config, out_dir, interactive=interactive)
 
 if __name__ == '__main__':
     get_studies_cli()
