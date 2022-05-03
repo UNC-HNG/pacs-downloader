@@ -231,17 +231,22 @@ def download_study(chosen_study, auth, fetch_date, out_dir, interactive=False):
     for index, series_item in enumerate(series):
         print(f"[{index}]: {series[index]['series_description']}")
     print(f"[{len(series)}]: ALL SERIES")
+    print(f"[{len(series) + 1}]: EXIT")
 
     # If running interactive, have user pick series to download, or all
     series_to_process = []
     if interactive:
         value = click.prompt(f'Choose a series to download ({0} - {len(series)})', type=int)
-        if value < 0 or value > len(series):
+        if value < 0 or value > len(series) + 1:
             print("Invalid option")
-            sys.exit()  
-        # if a single series was chosen
-        if value < len(series):
+            sys.exit() 
+        # Exit was chosen
+        if value > len(series):
+            sys.exit()
+        # A single series was chosen
+        elif value == len(series):
             series_to_process.append(series[value])
+        # All series chosen
         else:
             series_to_process += series
     else:
