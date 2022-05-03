@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name='pacs-sdk',
-      version='1.0.4',
+      version='1.0.5',
       description='An SDK and CLI for downloading image data from PACS.',
       url='https://github.com/UNC-HNG/pacs-downloader',
       author='Maintainer: Will Asciutto',
