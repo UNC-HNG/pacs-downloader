@@ -274,7 +274,7 @@ def download_study(chosen_study, auth, fetch_date, out_dir, interactive=False):
 
 
 
-def get_studies(interactive, fetch_date, auth_file, download_config, out_dir):
+def get_studies(fetch_date, auth_file, download_config, out_dir, interactive=False):
     """
     This method drives the download process from the CLI interactively, or from
     the download_configuration, if provided
@@ -292,17 +292,17 @@ def get_studies(interactive, fetch_date, auth_file, download_config, out_dir):
     # Setup basic auth from provided auth yaml file
     auth = get_auth(auth_file=auth_file)
     # Initial query to get list of studies on given date
-    studies = get_studies_by_date(auth, fetch_date=fetch_date)
+    available_studies = get_studies_by_date(auth, fetch_date=fetch_date)
 
     # Only proceed if we found studies for given date
-    if not studies:
+    if not available_studies:
         print(f"No studies found for date: {fetch_date}")
         sys.exit()
 
+    studies_filtered = []
     studies_to_download = []
     patient_subject_id_pattern = None
     patient_id_pattern = None
-    interactive = False
 
     if download_config:
         # Grab regex patterns from yaml
@@ -326,21 +326,23 @@ def get_studies(interactive, fetch_date, auth_file, download_config, out_dir):
             interactive = True
         else:
             # Go through the studies from given date and see if any match the pattern
-            for study in studies:
+            for study in available_studies:
                 is_match = re.search(patient_id_pattern, study['patient_id'])
                 if is_match:
-                    studies_to_download.append(study)
-            if not studies_to_download:
+                    studies_filtered.append(study)
+            if not studies_filtered:
                 print(f"No studies matching pattern: {patient_id_pattern}")
                 sys.exit()
-
-
-    # If no download config provided, must be interactive to ask user which study to download
+    # If no download config provided, must be interactive to ask user which study to download. No studies will be filtered.
     else:
+        studies_filtered = available_studies
         interactive = True
 
+    # If interactive, present the user with the filtered studies to choose from
     if interactive:    
-        studies_to_download = prompt_user_for_studies(studies)
+        studies_to_download = prompt_user_for_studies(studies_filtered)
+    else:
+        studies_to_download = studies_filtered
         
     # Now the we finally download the studies
     for study in studies_to_download:
@@ -361,7 +363,7 @@ def get_studies(interactive, fetch_date, auth_file, download_config, out_dir):
 @click.option('--download_config', '-c', required=False, help="A .yaml file which helps specify which studies to download.")
 @click.option('--out_dir', '-o', required=False, help="Where to save the image data - defaults to current directory.")
 def get_studies_cli(interactive, fetch_date, auth_file, download_config, out_dir):
-    get_studies(interactive, fetch_date, auth_file, download_config, out_dir)
+    get_studies(fetch_date, auth_file, download_config, out_dir, interactive=False)
 
 if __name__ == '__main__':
     get_studies_cli()
