@@ -318,7 +318,7 @@ def get_studies(fetch_date, auth_file, download_config, out_dir, interactive=Fal
         except KeyError:
             pass
 
-        if not (patient_subject_id_pattern or patient_id_pattern):
+        if not patient_subject_id_pattern and not patient_id_pattern:
             print("No patient subject id pattern provided - please check your download config formatting")
             sys.exit()
 
