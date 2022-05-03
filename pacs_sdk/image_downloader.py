@@ -301,23 +301,37 @@ def get_studies(fetch_date, auth_file, download_config, out_dir):
 
     studies_to_download = []
     patient_subject_id_pattern = None
+    patient_id_pattern = None
     interactive = False
 
     # Option 1: yaml-driven
     if download_config:
         # Grab regex patterns from yaml
         download_config = get_download_config(download_config)
-        patient_id_pattern = download_config['patient_id_pattern']
-        patient_subject_id_pattern = download_config['patient_subject_id_pattern']
+        try:
+            patient_id_pattern = download_config['patient_id_pattern']
+        except KeyError:
+            pass
+        try:
+            patient_subject_id_pattern = download_config['patient_subject_id_pattern']
+        except KeyError:
+            pass
 
-        # Go through the studies from given date and see if any match the pattern
-        for study in studies:
-            is_match = re.search(patient_id_pattern, study['patient_id'])
-            if is_match:
-                studies_to_download.append(study)
-        if not studies_to_download:
-            print(f"No studies matching pattern: {patient_id_pattern}")
+        if not patient_subject_id_pattern or patient_id_pattern:
+            print("No patient subject id pattern provided - please check your download config formatting")
             sys.exit()
+
+        if patient_subject_id_pattern and not patient_id_pattern:
+            interactive = True
+        else:
+            # Go through the studies from given date and see if any match the pattern
+            for study in studies:
+                is_match = re.search(patient_id_pattern, study['patient_id'])
+                if is_match:
+                    studies_to_download.append(study)
+            if not studies_to_download:
+                print(f"No studies matching pattern: {patient_id_pattern}")
+                sys.exit()
     # Option 2: interactive
     else:
         interactive = True
