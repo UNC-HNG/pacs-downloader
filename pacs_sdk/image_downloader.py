@@ -237,18 +237,19 @@ def download_study(chosen_study, auth, fetch_date, out_dir, interactive=False):
     series_to_process = []
     if interactive:
         value = click.prompt(f'Choose a series to download ({0} - {len(series)})', type=int)
-        if value < 0 or value > len(series) + 1:
-            print("Invalid option")
-            sys.exit() 
         # Exit was chosen
         if value > len(series):
             sys.exit()
-        # A single series was chosen
-        elif value == len(series):
-            series_to_process.append(series[value])
         # All series chosen
-        else:
+        elif value == len(series):
             series_to_process += series
+        # A single series was chosen
+        elif value < len(series):
+            series_to_process.append(series[value])
+        else:
+            print("Invalid option")
+            sys.exit(1)
+            
     else:
         series_to_process += series
 
