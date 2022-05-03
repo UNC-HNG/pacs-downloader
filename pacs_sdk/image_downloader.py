@@ -334,9 +334,6 @@ def get_studies(fetch_date, auth_file, download_config, out_dir):
                 sys.exit()
 
         download_study(study, auth, fetch_date, out_dir, interactive=interactive)
-        
-    else:
-        print("No studies found for this date")
 
 @click.command()
 @click.option('--fetch_date', '-d', required=False, help="Use to choose a date to search for data to download. Defaults to current day.")
