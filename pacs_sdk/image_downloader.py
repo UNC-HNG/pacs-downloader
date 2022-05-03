@@ -274,7 +274,7 @@ def download_study(chosen_study, auth, fetch_date, out_dir, interactive=False):
 
 
 
-def get_studies(interactive, fetch_date, auth_file, download_config, out_dir):
+def get_studies(fetch_date, auth_file, download_config, out_dir):
     """
     This method drives the download process from the CLI interactively, or from
     the download_configuration, if provided
@@ -301,49 +301,50 @@ def get_studies(interactive, fetch_date, auth_file, download_config, out_dir):
 
     studies_to_download = []
     patient_subject_id_pattern = None
+    interactive = False
 
-    # yaml-driven
+    # Option 1: yaml-driven
     if download_config:
         # Grab regex patterns from yaml
         download_config = get_download_config(download_config)
         patient_id_pattern = download_config['patient_id_pattern']
         patient_subject_id_pattern = download_config['patient_subject_id_pattern']
 
-        if interactive:
-            studies_to_download = prompt_user_for_studies(studies)
-        else:
-            # Go through the studies from given date and see if any match the pattern
-            for study in studies:
-                is_match = re.search(patient_id_pattern, study['patient_id'])
-                if is_match:
-                    studies_to_download.append(study)
-            if not studies_to_download:
-                print(f"No studies matching pattern: {patient_id_pattern}")
+        # Go through the studies from given date and see if any match the pattern
+        for study in studies:
+            is_match = re.search(patient_id_pattern, study['patient_id'])
+            if is_match:
+                studies_to_download.append(study)
+        if not studies_to_download:
+            print(f"No studies matching pattern: {patient_id_pattern}")
+            sys.exit()
+    # Option 2: interactive
+    else:
+        interactive = True
+        studies_to_download = prompt_user_for_studies(studies)
+        
+    # Now the we finally download the studies
+    for study in studies_to_download:
+        # Use provided subject id regex if provided to grab subject id from patient id field
+        if patient_subject_id_pattern:
+            try:
+                study['subject_id'] = str(re.search(patient_subject_id_pattern, study['patient_id'])[0])
+            except TypeError:
+                print(f"No pattern found matching {patient_subject_id_pattern} in {study['patient_id']}")
                 sys.exit()
 
-        # Now the we finally download the studies
-        for study in studies_to_download:
-            # Use provided subject id regex if provided to grab subject id from patient id field
-            if patient_subject_id_pattern:
-                try:
-                    study['subject_id'] = str(re.search(patient_subject_id_pattern, study['patient_id'])[0])
-                except TypeError:
-                    print(f"No pattern found matching {patient_subject_id_pattern} in {study['patient_id']}")
-                    sys.exit()
-
-            download_study(study, auth, fetch_date, out_dir, interactive=interactive)
+        download_study(study, auth, fetch_date, out_dir, interactive=interactive)
         
     else:
         print("No studies found for this date")
 
 @click.command()
-@click.option('--interactive', '-i', is_flag=True, required=False, default=False, help="Run in interactive mode.")
 @click.option('--fetch_date', '-d', required=False, help="Use to choose a date to search for data to download. Defaults to current day.")
 @click.option('--auth_file', '-a', required=True, help="A .yaml file containing your PACS credentials. See the project README for help setting this up.")  
 @click.option('--download_config', '-c', required=False, help="A .yaml file which helps specify which studies to download.")
 @click.option('--out_dir', '-o', required=False, help="Where to save the image data - defaults to current directory.")
-def get_studies_cli(interactive, fetch_date, auth_file, download_config, out_dir):
-    get_studies(interactive, fetch_date, auth_file, download_config, out_dir)
+def get_studies_cli(fetch_date, auth_file, download_config, out_dir):
+    get_studies(fetch_date, auth_file, download_config, out_dir)
 
 if __name__ == '__main__':
     get_studies_cli()
