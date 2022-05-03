@@ -310,10 +310,12 @@ def get_studies(fetch_date, auth_file, download_config, out_dir):
         download_config = get_download_config(download_config)
         try:
             patient_id_pattern = download_config['patient_id_pattern']
+            print(f"Using patient id pattern: {patient_id_pattern}")
         except KeyError:
             pass
         try:
             patient_subject_id_pattern = download_config['patient_subject_id_pattern']
+            print(f"Using patient subject id pattern: {patient_subject_id_pattern}")
         except KeyError:
             pass
 
