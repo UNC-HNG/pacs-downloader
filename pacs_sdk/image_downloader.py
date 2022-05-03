@@ -274,7 +274,7 @@ def download_study(chosen_study, auth, fetch_date, out_dir, interactive=False):
 
 
 
-def get_studies(fetch_date, auth_file, download_config, out_dir):
+def get_studies(interactive, fetch_date, auth_file, download_config, out_dir):
     """
     This method drives the download process from the CLI interactively, or from
     the download_configuration, if provided
@@ -333,6 +333,8 @@ def get_studies(fetch_date, auth_file, download_config, out_dir):
             if not studies_to_download:
                 print(f"No studies matching pattern: {patient_id_pattern}")
                 sys.exit()
+
+
     # If no download config provided, must be interactive to ask user which study to download
     else:
         interactive = True
@@ -353,12 +355,13 @@ def get_studies(fetch_date, auth_file, download_config, out_dir):
         download_study(study, auth, fetch_date, out_dir, interactive=interactive)
 
 @click.command()
+@click.option('--interactive', '-i', is_flag=True, required=False, default=False, help="Run in interactive mode.")
 @click.option('--fetch_date', '-d', required=False, help="Use to choose a date to search for data to download. Defaults to current day.")
 @click.option('--auth_file', '-a', required=True, help="A .yaml file containing your PACS credentials. See the project README for help setting this up.")  
 @click.option('--download_config', '-c', required=False, help="A .yaml file which helps specify which studies to download.")
 @click.option('--out_dir', '-o', required=False, help="Where to save the image data - defaults to current directory.")
-def get_studies_cli(fetch_date, auth_file, download_config, out_dir):
-    get_studies(fetch_date, auth_file, download_config, out_dir)
+def get_studies_cli(interactive, fetch_date, auth_file, download_config, out_dir):
+    get_studies(interactive, fetch_date, auth_file, download_config, out_dir)
 
 if __name__ == '__main__':
     get_studies_cli()
