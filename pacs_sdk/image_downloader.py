@@ -304,7 +304,6 @@ def get_studies(fetch_date, auth_file, download_config, out_dir):
     patient_id_pattern = None
     interactive = False
 
-    # Option 1: yaml-driven
     if download_config:
         # Grab regex patterns from yaml
         download_config = get_download_config(download_config)
@@ -334,9 +333,11 @@ def get_studies(fetch_date, auth_file, download_config, out_dir):
             if not studies_to_download:
                 print(f"No studies matching pattern: {patient_id_pattern}")
                 sys.exit()
-    # Option 2: interactive
+    # If no download config provided, must be interactive to ask user which study to download
     else:
         interactive = True
+
+    if interactive:    
         studies_to_download = prompt_user_for_studies(studies)
         
     # Now the we finally download the studies
